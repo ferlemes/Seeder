@@ -6,6 +6,7 @@
 #include "../Lib/Free_Fonts.h"
 #include "../qrcoded.h"
 #include "brand.h"
+#include "../battery.h"
 #if !defined(SEEDER_BOARD_TDISPLAY_S3)
   #include "../Lib/images_splash85.h"
 #endif
@@ -33,6 +34,16 @@ extern TFT_eSPI tft;
 
 namespace ui {
 
+enum class BatteryHud { None, Menu };
+static BatteryHud batteryHud = BatteryHud::None;
+static bool batteryHudDirty = true;
+static battery::Reading lastBattery = {battery::Source::Unknown, 0, 0};
+static void clearScreen() {
+  batteryHud = BatteryHud::None;
+  batteryHudDirty = true;
+  tft.fillScreen(UI_BG);
+}
+
 /*==============================================================
   PIEZAS
 ==============================================================*/
@@ -54,6 +65,49 @@ void tiny(const char *s, int x, int y, uint16_t col, char datum, int sp, uint8_t
 }
 static void tiny(const String &s, int x, int y, uint16_t col, char datum='L', int sp=0, uint8_t size=1){
   tiny(s.c_str(), x, y, col, datum, sp, size);
+}
+
+// Pixel primitives match the existing UI; the header background stays visible.
+static void drawPowerPlug(int x, int y, uint16_t ink) {
+  tft.fillRect(x+8, y+1, 2, 5, ink);
+  tft.fillRect(x+16, y+1, 2, 5, ink);
+  tft.fillRoundRect(x+6, y+5, 14, 7, 3, ink);
+  tft.fillRect(x+12, y+11, 2, 5, ink);
+  tft.drawFastHLine(x+13, y+14, 6, ink);
+  tft.drawFastHLine(x+13, y+15, 6, ink);
+}
+
+static void drawBatteryBars(int x, int y, uint8_t bars, uint16_t ink) {
+  tft.drawRoundRect(x, y+2, 25, 13, 2, ink);
+  tft.drawRoundRect(x+1, y+3, 23, 11, 1, ink);
+  tft.fillRect(x+25, y+6, 3, 5, ink);
+  for (uint8_t i=0; i<bars && i<4; ++i)
+    tft.fillRect(x+3+5*i, y+5, 4, 7, ink);
+}
+
+void refreshBatteryStatus() {
+#if defined(SEEDER_BOARD_TDISPLAY_S3)
+  if (batteryHud == BatteryHud::None) return;
+  const auto value = battery::reading();
+  const uint8_t bars = (value.estimatedPercent + 24) / 25;
+  const uint8_t previousBars = (lastBattery.estimatedPercent + 24) / 25;
+  if (!batteryHudDirty && value.source == lastBattery.source && bars == previousBars) return;
+  batteryHudDirty = false;
+  lastBattery = value;
+  const uint16_t background = UI_ACCENT;
+  const uint16_t ink = UI_BG;
+  const int x = UI_W - UI_M - 28;
+  const int y = (UI_HEAD_H-16)/2;
+  tft.fillRect(x, y, 28, 16, background);
+  if (value.source == battery::Source::External5V) drawPowerPlug(x, y, ink);
+  else if (value.source == battery::Source::Battery) drawBatteryBars(x, y, bars, ink);
+#endif
+}
+
+static void showBattery(BatteryHud mode) {
+  batteryHud = mode;
+  batteryHudDirty = true;
+  refreshBatteryStatus();
 }
 
 /* Cuerpo grande: lo que el usuario tiene que copiar a mano */
@@ -140,7 +194,9 @@ static void rail(const char *topAct, const char *botAct, bool showKeys){
   caret(UI_RAIL_CX, SY(124), SX(9), SY(-6), UI_DIM);
 }
 
-static void eyebrow(const char *s){ tiny(s, UI_M, SY(10), UI_ACCENT, 'L', 1); }
+static void eyebrow(const char *s){
+  tiny(s, UI_M, SY(10), UI_ACCENT, 'L', 1);
+}
 
 /* Número grande: el único elemento a voz alta de la pantalla */
 static int bigNumber(int n, int baselineY){
@@ -156,7 +212,7 @@ static int bigNumber(int n, int baselineY){
 /* Cabecera de las pantallas de semilla: etiqueta, paso y una regla fina.
    Sustituye a la franja verde maciza, que era lo que más envejecía la v1. */
 static void head(const char *title, uint8_t step, uint8_t total){
-  tft.fillScreen(UI_BG);
+  clearScreen();
   tiny(title, UI_M, SY(10), UI_ACCENT, 'L', 1);
   if(total){
     char b[8]; snprintf(b, sizeof(b), "%u/%u", step, total);
@@ -185,7 +241,7 @@ static void head(const char *title, uint8_t step, uint8_t total){
 ==============================================================*/
 
 void splash(void){
-  tft.fillScreen(UI_BG);
+  clearScreen();
   tft.pushImage((UI_W-logoWidth)/2, (UI_H-logoHeight)/2 - SY(8), logoWidth, logoHeight, seeder_logo);
   tiny("V" SEEDER_VERSION "  " SEEDER_COMMIT, UI_W/2, UI_H - SY(15), UI_DIM, 'C', 1);
   delay(2000);
@@ -199,7 +255,7 @@ void splash(void){
      (111 + 146, con el sp=1 que se les pasa) y la placa pequena tiene 240,
      de los que ademas 20 son margenes: se tocarian. Partidos en dos, el
      bloque mas ancho mide 69 y sobra sitio en las dos placas. */
-  tft.fillScreen(UI_BG);
+  clearScreen();
   const int cr2 = UI_H - SY(9) - UI_TINY_H;     //linea de los nombres
   const int cr1 = cr2 - SY(12);                 //linea de las preposiciones
 
@@ -218,18 +274,22 @@ void splash(void){
   tiny("CREDITS TO", UI_W - UI_M, cr1, UI_DIM,  'R', 1);
   tiny("LUNATICOIN", UI_W - UI_M, cr2, UI_TEXT, 'R', 1);
   delay(2000);
-  tft.fillScreen(UI_BG);
+  clearScreen();
 }
 
 /* Cabecera de marca: verde macizo con tinta negra. Es lo que separa el menú
    de las pantallas de trabajo, y por eso vuelve. Sin la palabra MENU: ya se
    ve. El logotipo y la hoja son recortes del arte original (ver brand.h). */
-static void greenHead(void){
+static void greenHead(bool powerIndicator = false){
   tft.fillRect(0, 0, UI_W, UI_HEAD_H, UI_ACCENT);
-  /* Los dos son bitmaps: no escalan, se colocan. Uno pegado al margen
-     izquierdo y el otro al derecho, centrados en la franja. */
+  /* Keep the original wordmark. The S3 reserves the right corner for power;
+     the classic board keeps its original leaf bitmap. */
   tft.pushImage(SX(10), (UI_HEAD_H-seederMarkHeight)/2,
                 seederMarkWidth, seederMarkHeight, seederMark);
+#if defined(SEEDER_BOARD_TDISPLAY_S3)
+  if (powerIndicator) showBattery(BatteryHud::Menu);
+  else
+#endif
   tft.pushImage(UI_W - leafMarkWidth - SX(10), (UI_HEAD_H-leafMarkHeight)/2,
                 leafMarkWidth, leafMarkHeight, leafMark);
 }
@@ -255,8 +315,8 @@ static void listRow(int y, bool sel, uint16_t col, const char *lab, const char *
 }
 
 void menu(bool diceSelected){
-  tft.fillScreen(UI_BG);
-  greenHead();
+  clearScreen();
+  greenHead(true);
   thinRail();
 
   const uint16_t dc = diceSelected ? UI_ACCENT : UI_DIM;
@@ -270,7 +330,7 @@ void menu(bool diceSelected){
 }
 
 void words(uint8_t nWords){
-  tft.fillScreen(UI_BG);
+  clearScreen();
   greenHead();
   thinRail();
 
@@ -293,7 +353,7 @@ void words(uint8_t nWords){
 
 /*----------------- captura de moneda -----------------*/
 void coinEnter(uint16_t totalBits){
-  tft.fillScreen(UI_BG);
+  clearScreen();
   eyebrow("FLIP COIN");
   rail("HEADS", "TAILS", false);   //arriba cara, abajo cruz: no hace falta más
 }
@@ -335,7 +395,7 @@ void coinUpdate(uint16_t done, uint16_t totalBits, const uint8_t *entropy){
 
 /*----------------- captura de dado -----------------*/
 void diceEnter(uint8_t totalRolls){
-  tft.fillScreen(UI_BG);
+  clearScreen();
   eyebrow("ROLL DICE");
   tiny("ROLLS LEFT", UI_M, SY(64), UI_DIM, 'L', 1);
   rail("1-6", "ACCEPT", true);
@@ -371,6 +431,7 @@ void diceUpdate(uint8_t done, uint8_t totalRolls, uint8_t value, const uint8_t *
 static int holdFilled = 0;          //ancho ya pintado de la barra
 
 void holdEnter(void){
+  batteryHud = BatteryHud::None;
   tft.fillRect(0, 0, UI_RAIL_X, UI_H, UI_BG);
   tiny("START OVER",        UI_RAIL_X/2, SY(38), UI_TEXT, 'C', 1, UI_BIG_BODY);
   tft.fillRect(UI_M, SY(68), UI_RAIL_X - 2*UI_M, SY(10), UI_TRACK);
@@ -396,7 +457,7 @@ void holdUpdate(float frac){
 }
 
 void generating(void){
-  tft.fillScreen(UI_BG);
+  clearScreen();
   tiny("GENERATING SEED", UI_W/2, UI_H/2 - SY(4), UI_ACCENT, 'C', 1);
 }
 
@@ -483,7 +544,7 @@ static void qrPage(const char *tag, const char *l1, const char *l2,
   int quiet = (UI_H - qrcode.size*px) / (2*px);
   if(quiet > QUIET_MAX) quiet = QUIET_MAX;
 
-  tft.fillScreen(UI_BG);
+  clearScreen();
   tiny(tag, UI_M, SY(10), UI_ACCENT, 'L', 1);
   tiny(l1,  UI_M, SY(34), UI_TEXT,   'L', 0);   //lo que hay dentro: lo primero que se lee
   tiny(l2,  UI_M, SY(44), UI_DIM,    'L', 0);
@@ -534,7 +595,7 @@ void seedZpubQr(const String &data, const String &fingerprint){
 }
 
 void seedExit(void){
-  tft.fillScreen(UI_BG);
+  clearScreen();
 
   /* Cabecera distinta a propósito: una regla con la etiqueta incrustada.
      Esta pantalla no es una más de la semilla, y debe notarse. */
@@ -559,6 +620,29 @@ void seedExit(void){
   tiny("HOLD OK", bx + bw/2, by + (bh-8*UI_BIG_BODY)/2, UI_ACCENT, 'C', 1, UI_BIG_BODY);
   /* la punta señala al botón OK físico, en el borde derecho */
   tft.fillTriangle(UI_W-SX(6), by+SY(9), UI_W-SX(6), by+SY(21), UI_W-SX(1), by+SY(15), UI_ACCENT);
+}
+
+void powerIdleWarning(uint8_t seconds){
+  clearScreen();
+  char message[24];
+  snprintf(message, sizeof(message), "SLEEP IN %us", unsigned(seconds));
+  tiny("AUTO SLEEP", UI_W/2, SY(10), UI_DIM, 'C', 1);
+  tiny(message, UI_W/2, SY(35), UI_ACCENT, 'C', 0, 2);
+  tiny("UNSAVED DATA WILL BE LOST", UI_W/2, SY(67), UI_TEXT, 'C');
+  tiny("PRESS ANY BUTTON TO STAY", UI_W/2, SY(88), UI_DIM, 'C');
+  bar(UI_M, SY(111), UI_W - 2*UI_M, SY(4), float(seconds)/30.0f);
+}
+
+void powerManualWarning(uint8_t seconds){
+  clearScreen();
+  char message[24];
+  snprintf(message, sizeof(message), "HOLD BOTH: %us", unsigned(seconds));
+  tiny("SLEEP", UI_W/2, SY(10), UI_DIM, 'C', 1);
+  tiny(seconds ? message : "RELEASE BOTH", UI_W/2, SY(35), UI_ACCENT, 'C', 0, 2);
+  tiny("UNSAVED DATA WILL BE LOST", UI_W/2, SY(67), UI_TEXT, 'C');
+  tiny(seconds ? "RELEASE EARLY TO CANCEL" : "THEN PRESS MOVE TO WAKE",
+       UI_W/2, SY(88), UI_DIM, 'C');
+  bar(UI_M, SY(111), UI_W - 2*UI_M, SY(4), 1.0f - float(seconds)/3.0f);
 }
 
 }  // namespace ui

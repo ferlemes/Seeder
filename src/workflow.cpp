@@ -96,6 +96,18 @@ static void redrawCapture(void){
   }
 }
 
+// Restore the exact page/capture after dismissing a power overlay.
+void redrawCurrentScreen(void){
+  holdArmed = false;
+  switch(myWallet.State){
+    case STATE_INITMENU: drawInitMenu(); break;
+    case STATE_WORDS: drawWordsMenu(); break;
+    case STATE_SEED: drawSeedPage(); break;
+    case STATE_COINSEED:
+    case STATE_DICESEED: redrawCapture(); break;
+  }
+}
+
 //true = el ciclo ya esta servido; mientras el aviso esta puesto no responde
 //nada mas de la pantalla, tampoco MOVE
 static bool holdToStartOver(void){

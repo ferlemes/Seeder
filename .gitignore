@@ -2,3 +2,12 @@
 .vscode/
 dist/
 *.bin
+
+# Local device backups, build artifacts and isolated SDK packages
+/backup*/
+/dist-*/
+/.platformio-offline/
+/tests/build/
+__pycache__/
+*.pyc
+sdkconfig.*.old

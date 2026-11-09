@@ -3,6 +3,9 @@
 #include "btc.h"
 #include "workflow.h"
 #include "GlobalVARS.h"
+#include "power.h"
+#include "battery.h"
+#include "ui/ui.h"
 
 sWallet myWallet;
 sButton btnMove(PIN_MOVE);
@@ -13,6 +16,7 @@ void setup() {
 #if SEEDER_DEBUG
   Serial.begin(SERIAL_BAUD);                  // UART only exists in debug builds
 #endif
+  power::begin();
   Init_TFT();                                   // Init TFT wallet
   myWallet.State = STATE_INITMENU;
 }
@@ -21,6 +25,9 @@ void setup() {
 void loop() {
   
   while(true){
+    battery::tick();
+    ui::refreshBatteryStatus();
+    if (power::tick()) { delay(10); continue; }
     /***** Check button state ******/
     btnMove.check();
     btnSelect.check();

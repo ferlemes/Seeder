@@ -1,5 +1,52 @@
 # SEEDER - Sovereign seed generator
 
+## ferlemes fork: offline firmware
+
+This fork adds radio hardening for the T-Display and T-Display-S3. The S3 build
+also adds automatic deep sleep, button wake and discreet power icons. The
+firmware interface remains in English.
+
+- No Wi-Fi, Bluetooth or coexistence support in the offline build; proprietary
+  RF libraries and PHY implementations are excluded. The SDK and bootloader
+  are rebuilt from source. Static inspection is not a physical RF measurement.
+- S3: sleeps after five idle minutes, with a warning during the last 30 seconds.
+  Either button dismisses the warning without recording an input.
+- Hold both buttons for three seconds, then release both, to sleep manually.
+  Press and release MOVE to wake at the main menu. Unsaved seed data is lost.
+- S3 main menu only: a plug icon indicates external 5 V power; a battery icon uses up to four
+  voltage-estimated bars. Charging status cannot be read by the MCU.
+
+Use a dedicated PlatformIO package directory: `hardening/prepare.py` patches SDK
+build files there. Do not reuse it for unrelated Arduino projects.
+
+```sh
+python -m pip install platformio==6.2.0 pyelftools
+PLATFORMIO_CORE_DIR="$PWD/.platformio-offline" pio run -e tdisplay-s3-offline
+python hardening/audit.py "$PWD/.platformio-offline/packages/toolchain-xtensa-esp32s3/bin" tdisplay-s3-offline
+```
+
+For the classic T-Display, use `-e tdisplay-offline` and audit with the
+`toolchain-xtensa-esp32/bin` directory and `tdisplay-offline` argument instead.
+The sleep and battery UI customization applies to the S3.
+
+Host tests:
+
+```sh
+g++ -std=c++11 -Wall -Wextra -Werror tests/power_policy_test.cpp -o /tmp/seeder-power-test
+/tmp/seeder-power-test
+g++ -std=c++11 -Wall -Wextra -Werror tests/battery_model_test.cpp -o /tmp/seeder-battery-test
+/tmp/seeder-battery-test
+```
+
+See [hardening/BUILD-S3.txt](hardening/BUILD-S3.txt),
+[hardening/BUILD-SLEEP.txt](hardening/BUILD-SLEEP.txt) and
+[HARDWARE.md](HARDWARE.md) for configuration and hardware details. The upstream
+documentation below remains available; its standard build/release commands do
+not select this fork's offline environments. Device backups and local firmware
+artifacts are excluded from Git.
+
+---
+
 Un dispositivo DIY que te permite crear tus propias semillas de Bitcoin en cuestión
 de segundos, sin depender de nadie ni de nada para salvaguardar tus fondos.
 

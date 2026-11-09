@@ -41,5 +41,8 @@ void seedEntropy(const String &hex, uint8_t step, uint8_t total);
 void seedQr(const String &data, uint8_t nWords);
 void seedZpubQr(const String &data, const String &fingerprint);
 void seedExit(void);
+void powerIdleWarning(uint8_t seconds);
+void powerManualWarning(uint8_t seconds);
+void refreshBatteryStatus();
 
 }  // namespace ui

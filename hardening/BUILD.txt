@@ -1,0 +1,40 @@
+Seeder 2.2.0-offline for LilyGO TTGO T-Display (classic ESP32, 16 MB flash)
+Upstream commit: ba6e9ebe226222cbb04415a635a934eeae372dab
+
+Changes:
+- Mixed Arduino + ESP-IDF build, rebuilding SDK and bootloader from source.
+- Minimal Arduino component: core plus FS, SPI, SPIFFS; no network libraries.
+- CONFIG_ESP32_NO_BLOBS=y; Wi-Fi, Bluetooth and coexistence disabled.
+- Wi-Fi and PHY components expose headers only plus unused exclusion markers;
+  no radio API stubs are provided. A call to an unavailable API fails to link.
+- Arduino's hidden dependency selection and ESP-IDF's hidden Wi-Fi default
+  are changed only inside a dedicated PlatformIO package directory.
+- One factory app partition; no OTA; console, logging and flash core dumps off.
+- No Secure Boot, flash encryption or irreversible eFuse provisioning.
+- Seed generation and cryptographic library code unchanged.
+
+Build tools used:
+PlatformIO 6.2.0, platform espressif32 6.9.0
+Arduino framework 3.20017.241212+sha.dcc1105b
+ESP-IDF framework 3.40407.240606 (4.4.7)
+Xtensa GCC 8.4.0+2021r2-patch5
+
+Rebuild in an isolated PlatformIO package directory (prepare.py patches SDK
+files there; do not point this at a package cache shared with other projects):
+  PLATFORMIO_CORE_DIR="$PWD/.platformio-offline" pio run -e tdisplay-offline
+After changes to prepare.py, run the same command with '-t clean' first.
+Audit:
+  python hardening/audit.py "$PWD/.platformio-offline/packages/toolchain-xtensa-esp32/bin"
+The audit requires pyelftools and examines firmware AND bootloader.
+
+Artifacts were built with PLATFORMIO_CORE_DIR=/tmp/seeder-pio.
+The merged image contains the three audited images byte-for-byte at offsets
+0x1000 (bootloader), 0x8000 (partition table), 0x10000 (application).
+It is written at offset 0 after a full erase; the old 16 MB image is backed up.
+
+Validation:
+uBitcoin host tests: 9 tests, 80 assertions, zero failures.
+ELF symbols and linker maps: no radio APIs matched the audit denylist and no
+proprietary radio blobs were linked. ELF load sections match both .bin files.
+No RF instrumentation was used. This is software hardening, not physical
+removal of the ESP32 radio or an exhaustive formal proof of no RF emission.

@@ -2,6 +2,7 @@
 #include "gpio.h"
 #include "workflow.h"
 #include "ui/ui.h"
+#include "battery.h"
 #include <TFT_eSPI.h> // Graphics and font library for ST7789 driver chip
 
 /**********************🍃 GLOBAL Vars *******************************/
@@ -23,6 +24,7 @@ void Init_TFT(void){
   delay(20);
 #endif
 
+  battery::begin();
   tft.init();
   tft.setRotation(1);
   tft.setSwapBytes(true);   // orden de bytes al volcar imágenes
@@ -40,7 +42,14 @@ sButton::sButton(byte bPin){        //Constructor
     antState = HIGH; longFired = holdFired = false;
     msecLst = msecEdge = 0; clickState = None;
 }
-void sButton::init(void){  pinMode(pin, INPUT); }     // Init pushbutton pin
+void sButton::init(void){
+    pinMode(pin, INPUT);
+    antState = HIGH;
+    longFired = holdFired = false;
+    msecLst = 0;
+    msecEdge = millis();
+    clickState = None;
+}
 int sButton::click(void){  return clickState; }
 void sButton::forceClick(void){ clickState = ForcedClick;} //Generates one click loop
 

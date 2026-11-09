@@ -1,0 +1,5 @@
+config SEEDER_NO_RADIO
+    bool
+    default y
+    help
+        Exclude radio component implementations from this offline appliance.

@@ -9,3 +9,5 @@ void doCoinSeed(void);
 void doDiceSeed(void);
 void drawInitMenu(void);
 void drawWordsMenu(void);
+void wipeSeed(void);
+void redrawCurrentScreen(void);

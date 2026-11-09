@@ -1,0 +1,36 @@
+Seeder 2.2.3-offline-sleep, T-Display-S3
+
+Extends the previous S3 offline configuration with:
+- Deep sleep after 5 idle minutes, warning during the final 30 seconds.
+- Either button cancels the warning; cancellation/wake button sequences are
+  consumed until both buttons have been released continuously for 30 ms.
+- Both buttons held for 3 seconds arm manual sleep; release both to enter.
+- RTC EXT0 wake uses MOVE (GPIO14); startup returns to the main menu.
+- Existing wipeSeed runs before panel/display shutdown. LCD GPIO15 and
+  backlight GPIO38 are held low during sleep and released before display init.
+- No wallet data is placed in RTC retention memory or written to flash.
+- ADC1/GPIO4 voltage sampled with calibration and 16-reading averaging every
+  5 seconds. Approximate 10%-step battery estimate only on battery voltage.
+- External 5V readings show a small plug icon. Battery operation shows a battery
+  icon with up to four bars. No text, percentage or badge is drawn. CHRG is not
+  wired to an MCU GPIO; the plug does not indicate true charging/completion.
+- Power icons appear only on the main menu and do not count as user activity.
+
+SDK hardening compatibility:
+IDF 4.4.7 sleep_modes.c normally references PHY cleanup APIs even without radio
+support. prepare.py now conditionally excludes exactly that RF cleanup branch
+for SEEDER_NO_RADIO/ESP32_NO_BLOBS. Non-radio sleep workarounds are unchanged.
+No radio API stubs or radio libraries were added. Audit denies esp_phy_* too.
+
+Validation:
+- Host tests in tests/power_policy_test.cpp and tests/battery_model_test.cpp,
+  compiled with -Wall -Wextra -Werror, AddressSanitizer and UBSan.
+- LeakSanitizer disabled for host execution because the sandbox uses ptrace;
+  AddressSanitizer and UBSan remain enabled.
+- Firmware and bootloader ELF/maps audited; loaded sections match .bin images.
+- Power consumption and battery capacity accuracy have not been measured.
+- Screen/button/sleep behavior must be checked on the target hardware.
+
+Rebuild using the same isolated-cache command documented in BUILD-S3.txt.
+The environment is tdisplay-s3-offline. Version is set in platformio.ini.
+Device backups and compiled images are local artifacts, excluded from Git.
